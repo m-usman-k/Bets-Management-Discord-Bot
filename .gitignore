@@ -1,6 +1,6 @@
 # Files
 .env
-.db
+*.db
 
 # Folders
 */__pycache__

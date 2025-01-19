@@ -10,6 +10,7 @@ class Database:
         self.connection = sqlite3.connect(self.db_name)
         self.cursor = self.connection.cursor()
         self.create_users_table()
+        self.create_polls_table()
 
     def create_users_table(self):
         """
@@ -23,7 +24,43 @@ class Database:
         )
         ''')
         self.connection.commit()
-
+        
+    def create_polls_table(self):
+        """
+        Create the 'polls' table if it does not exist.
+        """
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS polls (
+            pollid INTEGER PRIMARY KEY,
+            question TEXT NOT NULL,
+            first_option TEXT NOT NULL,
+            first_joinees TEXT,
+            second_option TEXT NOT NULL,
+            second_joinees TEXT,
+            expiry_time INTEGER NOT NULL,
+            is_active INTEGER NOT NULL
+        )
+        ''')
+        self.connection.commit()
+        
+    def poll_exists(self, pollid):
+        """
+        Check if a user exists in the database.
+        :param pollid: The ID of the poll to check.
+        :return: True if the poll exists, False otherwise.
+        """
+        self.cursor.execute('SELECT 1 FROM polls WHERE pollid = ?', (pollid,))
+        return self.cursor.fetchone() is not None
+    
+    def add_poll(self , pollid: int , question: str , first_option: str , second_option: str , first_joinees: str , second_joinees: str , expiry_time_hours: float , is_active: int):
+        
+        if not self.user_exists(pollid):
+            self.cursor.execute('INSERT INTO users (userid, username) VALUES (?, ?)', (userid, username))
+            self.connection.commit()
+            return True
+        return False
+        
+        
     def user_exists(self, userid):
         """
         Check if a user exists in the database.

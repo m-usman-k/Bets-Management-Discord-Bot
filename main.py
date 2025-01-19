@@ -13,7 +13,9 @@ bot = commands.Bot(command_prefix="!" , intents=discord.Intents().all())
 @bot.event
 async def on_ready():
     
-    await bot.load_extension("extensions.Bets")
+    await bot.load_extension("extensions.Polls")
+    
+    print("Loaded Polls extension")
     
     await bot.tree.sync()
 
