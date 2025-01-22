@@ -1,4 +1,4 @@
-import sqlite3
+import sqlite3, time
 
 class Database:
     def __init__(self, db_name):
@@ -52,13 +52,113 @@ class Database:
         self.cursor.execute('SELECT 1 FROM polls WHERE pollid = ?', (pollid,))
         return self.cursor.fetchone() is not None
     
-    def add_poll(self , pollid: int , question: str , first_option: str , second_option: str , first_joinees: str , second_joinees: str , expiry_time_hours: float , is_active: int):
-        
-        if not self.user_exists(pollid):
-            self.cursor.execute('INSERT INTO users (userid, username) VALUES (?, ?)', (userid, username))
+    def set_poll_inactive(self, pollid: int) -> bool:
+        """
+        Set a poll as inactive.
+        :param pollid: The ID of the poll to set as inactive.
+        :return: True if the poll was set as inactive successfully, False otherwise.
+        """
+        if self.poll_exists(pollid):
+            self.cursor.execute('UPDATE polls SET is_active = 0 WHERE pollid = ?', (pollid,))
             self.connection.commit()
             return True
         return False
+
+    def add_poll(self , pollid: int , question: str , first_option: str , second_option: str , expiry_time_hours: float , is_active: int):
+        
+        if not self.poll_exists(pollid):
+            self.cursor.execute('INSERT INTO polls (pollid, question, first_option, first_joinees, second_option, second_joinees, expiry_time, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', (pollid, question, first_option, "", second_option, "", expiry_time_hours, is_active))
+            self.connection.commit()
+            return True
+        return False
+    
+    def get_top_users(self, limit=10):
+        """
+        Retrieve the top users by points.
+        :param limit: Number of top users to retrieve.
+        :return: A list of tuples containing user data.
+        """
+        self.cursor.execute('SELECT username, points FROM users ORDER BY points DESC LIMIT ?', (limit,))
+        return self.cursor.fetchall()
+    
+    def poll_not_expired(self, pollid: int):
+        if self.poll_exists(pollid=pollid):
+            self.cursor.execute('SELECT expiry_time, is_active FROM polls WHERE pollid = ?', (pollid,))
+            expiry_time, is_active = self.cursor.fetchone()
+            if expiry_time > time.time() and is_active == 1:
+                return True
+            
+            return False
+    
+    def add_user_to_poll(self, userid: int, poll_option: str, pollid: str, bet_amount: int) -> int | bool:
+        if self.poll_exists(pollid=pollid):
+            self.cursor.execute("""
+                SELECT first_joinees, second_joinees
+                FROM polls
+                WHERE pollid = ?""", (pollid, ))
+            
+            first_joined_users, second_joined_users = self.cursor.fetchone()
+            all_joinees = f"{first_joined_users},{second_joined_users}"
+            all_joinees_list = all_joinees.split(",")
+            all_joinees_cleaned = []
+            for joinee in all_joinees_list:
+                try:
+                    all_joinees_cleaned.append(int(joinee.split(":")[0]) )
+                except:
+                    continue
+
+            if userid in all_joinees_cleaned:
+                return 2
+            
+            self.cursor.execute("""
+                SELECT first_option, second_option, first_joinees, second_joinees
+                FROM polls
+                WHERE pollid = ?
+            """, (pollid, ))
+            
+            row = self.cursor.fetchone()
+            
+            if not row:
+                print("No matching option found.")
+                return
+            
+            first_option, second_option, first_joinees, second_joinees = row
+            
+            if poll_option == first_option:
+                # Update first_joinees
+                new_first_joinees = f"{first_joinees},{userid}:{bet_amount}" if first_joinees else f"{userid}:{bet_amount}"
+                self.cursor.execute("""
+                    UPDATE polls
+                    SET first_joinees = ?
+                    WHERE first_option = ?
+                """, (new_first_joinees, first_option))
+            
+            elif poll_option == second_option:
+                # Update second_joinees
+                new_second_joinees = f"{second_joinees},{userid}:{bet_amount}" if second_joinees else f"{userid}:{bet_amount}"
+                self.cursor.execute("""
+                    UPDATE polls
+                    SET second_joinees = ?
+                    WHERE second_option = ?
+                """, (new_second_joinees, second_option))
+            
+            else:
+                print("Option does not match either column.")
+                return False
+            
+            self.connection.commit()
+            print("User ID added successfully.")
+            return True
+            
+        return False
+    
+    def get_poll_expiry_time(self, pollid: int):
+        self.cursor.execute("SELECT expiry_time FROM polls WHERE id = ?", (pollid,))
+        row = self.cursor.fetchone()
+        if row:
+            return row[0]
+        
+        return None
         
         
     def user_exists(self, userid):
